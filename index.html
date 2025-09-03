@@ -4,7 +4,6 @@
   <title>--r6 recoil compensation--</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Custom slider styling */
     input[type=range] {
       -webkit-appearance: none;
       appearance: none;
@@ -37,12 +36,9 @@
 </head>
 <body class="bg-black text-white font-sans">
   <div class="flex h-screen">
-    <!-- Sidebar -->
     <div class="w-64 bg-black border-r border-red-600 p-4 flex flex-col">
       <h1 class="text-xl font-bold mb-6 text-red-600">R6 Script</h1>
       <nav id="presetMenu" class="flex flex-col gap-3">
-        
-        <!-- SMGs -->
         <div>
           <button class="w-full text-left px-2 py-1 font-bold border-b border-red-600" onclick="toggleCategory('smgs')">SMGs</button>
           <div id="smgs" class="hidden flex flex-col gap-1 mt-1 ml-3">
@@ -51,8 +47,6 @@
             <button class="preset-btn text-left px-2 py-1 rounded border border-white bg-black text-white" data-preset="mp5">MP5</button>
           </div>
         </div>
-
-        <!-- ARs -->
         <div>
           <button class="w-full text-left px-2 py-1 font-bold border-b border-red-600" onclick="toggleCategory('ars')">ARs</button>
           <div id="ars" class="hidden flex flex-col gap-1 mt-1 ml-3">
@@ -61,42 +55,37 @@
             <button class="preset-btn text-left px-2 py-1 rounded border border-white bg-black text-white" data-preset="f2">F2</button>
           </div>
         </div>
-
-        <!-- Custom -->
         <div>
           <button class="w-full text-left px-2 py-1 font-bold border-b border-red-600" onclick="toggleCategory('customCat')">Custom</button>
           <div id="customCat" class="hidden flex flex-col gap-1 mt-1 ml-3">
             <button class="preset-btn text-left px-2 py-1 rounded border border-white bg-black text-white" data-preset="custom">Custom</button>
           </div>
         </div>
-
       </nav>
     </div>
 
-    <!-- Main Content -->
     <div class="flex-1 p-6 overflow-y-auto">
       <h2 id="activePreset" class="text-2xl font-semibold mb-6">No Preset Loaded</h2>
 
-      <!-- Toggle -->
-      <div class="mb-6">
+      <div class="mb-6 flex gap-4">
         <button id="toggleBtn" class="bg-red-600 px-4 py-2 rounded w-32 font-bold" onclick="toggle()">OFF</button>
+        <button id="hipfireBtn" class="bg-red-600 px-4 py-2 rounded w-32 font-bold" onclick="toggleHipfire()">HIPFIRE OFF</button>
       </div>
 
-      <!-- Sliders -->
       <div class="grid grid-cols-1 gap-6 max-w-lg">
         <div>
           <label class="block mb-1">X Strength</label>
-          <input id="xval" type="range" min="-5" max="5" step="0.01" value="0">
+          <input id="xval" type="range" min="-5" max="5" step="0.0001" value="0">
           <span id="xvalLabel" class="text-red-600 font-bold">0</span>
         </div>
         <div>
           <label class="block mb-1">Y Strength</label>
-          <input id="yval" type="range" min="0" max="30" step="0.1" value="0">
+          <input id="yval" type="range" min="0" max="30" step="0.0001" value="0">
           <span id="yvalLabel" class="text-red-600 font-bold">0</span>
         </div>
         <div>
           <label class="block mb-1">Speed</label>
-          <input id="speed" type="range" min="0.001" max="0.1" step="0.001" value="0">
+          <input id="speed" type="range" min="0.0001" max="0.1" step="0.0001" value="0">
           <span id="speedLabel" class="text-red-600 font-bold">0</span>
         </div>
       </div>
@@ -104,16 +93,32 @@
   </div>
 
   <script>
-  // Toggle category collapse
+  let toggleState = false;
+  let hipfireState = false;
+  let pollingInterval = null;
+
   function toggleCategory(id){
     document.getElementById(id).classList.toggle("hidden");
   }
 
-  // Toggle button
   function toggle(){
-    fetch('/toggle')
-      .then(r=>r.json())
-      .then(d=> updateToggleButton(d.state));
+    fetch('/toggle').then(r=>r.json()).then(d=>{
+      toggleState = d.state;
+      updateToggleButton(d.state);
+    });
+  }
+
+  function toggleHipfire(){
+    fetch('/hipfire', {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({hipfire: !hipfireState})
+    })
+    .then(r=>r.json())
+    .then(d=>{
+      hipfireState = d.hipfire;
+      updateHipfireButton(d.hipfire);
+    });
   }
 
   function updateToggleButton(state){
@@ -129,61 +134,80 @@
     }
   }
 
-// Sliders update backend
-function bindSlider(id, labelId){
-  const slider = document.getElementById(id);
-  const label = document.getElementById(labelId);
-  slider.addEventListener("input", ()=> {
-    label.innerText = slider.value; // exact value
-    fetch("/set", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({[id]:parseFloat(slider.value)})
-    });
-  });
-}
-bindSlider("xval","xvalLabel");
-bindSlider("yval","yvalLabel");
-bindSlider("speed","speedLabel");
+  function updateHipfireButton(state){
+    const btn = document.getElementById("hipfireBtn");
+    if(state){
+      btn.innerText = "HIPFIRE ON";
+      btn.classList.remove("bg-red-600");
+      btn.classList.add("bg-green-600");
+    } else {
+      btn.innerText = "HIPFIRE OFF";
+      btn.classList.remove("bg-green-600");
+      btn.classList.add("bg-red-600");
+    }
+  }
 
-// Presets: highlight + update sliders/labels
-document.querySelectorAll(".preset-btn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    const preset = btn.dataset.preset;
-
-    // clear highlight
-    document.querySelectorAll(".preset-btn").forEach(b=>{
-      b.classList.remove("bg-red-600","text-white");
-      b.classList.add("bg-black","text-white","border","border-white");
-    });
-
-    // highlight active
-    btn.classList.remove("bg-black","border","border-white");
-    btn.classList.add("bg-red-600","text-white");
-
-    // fetch preset values from backend
-    fetch("/preset/"+preset)
-      .then(r=>r.json())
-      .then(d=>{
-        document.getElementById("activePreset").innerText = "Preset: "+preset.toUpperCase();
-
-        // set sliders + labels to preset values EXACTLY
-        document.getElementById("xval").value = d.x;
-        document.getElementById("yval").value = d.y;
-        document.getElementById("speed").value = d.speed;
-
-        document.getElementById("xvalLabel").innerText = d.x;
-        document.getElementById("yvalLabel").innerText = d.y;
-        document.getElementById("speedLabel").innerText = d.speed;
+  function bindSlider(id, labelId){
+    const slider = document.getElementById(id);
+    const label = document.getElementById(labelId);
+    slider.addEventListener("input", ()=> {
+      label.innerText = slider.value;
+      fetch("/set", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({[id]:parseFloat(slider.value)})
       });
-  });
-});
+    });
+  }
+  bindSlider("xval","xvalLabel");
+  bindSlider("yval","yvalLabel");
+  bindSlider("speed","speedLabel");
 
-  // Sync toggle state on load
-  window.onload = ()=>{
+  document.querySelectorAll(".preset-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const preset = btn.dataset.preset;
+      document.querySelectorAll(".preset-btn").forEach(b=>{
+        b.classList.remove("bg-red-600","text-white");
+        b.classList.add("bg-black","text-white","border","border-white");
+      });
+      btn.classList.remove("bg-black","border","border-white");
+      btn.classList.add("bg-red-600","text-white");
+      fetch("/preset/"+preset)
+        .then(r=>r.json())
+        .then(d=>{
+          document.getElementById("activePreset").innerText = "Preset: "+preset.toUpperCase();
+          document.getElementById("xval").value = d.x;
+          document.getElementById("yval").value = d.y;
+          document.getElementById("speed").value = d.speed;
+          document.getElementById("xvalLabel").innerText = d.x;
+          document.getElementById("yvalLabel").innerText = d.y;
+          document.getElementById("speedLabel").innerText = d.speed;
+          hipfireState = !!d.hipfire;
+          updateHipfireButton(hipfireState);
+        });
+    });
+  });
+
+  function pollStatus(){
     fetch('/status')
       .then(r=>r.json())
-      .then(d=> updateToggleButton(d.state));
+      .then(d=>{
+        if (d.state !== toggleState){
+          toggleState = d.state;
+          updateToggleButton(d.state);
+        }
+        if (d.hipfire !== hipfireState){
+          hipfireState = d.hipfire;
+          updateHipfireButton(d.hipfire);
+        }
+      })
+      .catch(()=>{});
+  }
+
+  window.onload = ()=>{
+    pollStatus();
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(pollStatus, 300);
   };
   </script>
 </body>
