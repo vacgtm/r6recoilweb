@@ -64,7 +64,7 @@ def run_all(pre):
     elif pre.lower() == "mp7":
         x_val = 0.05; y_val = 7.4; speed = 0.02
     elif pre.lower() == "smg12":
-        x_val = 3.5; y_val = 23; speed = 0.047
+        x_val = -1.18; y_val = 23; speed = 0.047
     elif pre.lower() == "mp5":
         x_val = 0.05; y_val = 11; speed = 0.05
     elif pre.lower() == "ak12":
