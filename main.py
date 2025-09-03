@@ -6,7 +6,6 @@ import ctypes, os
 from modules.readjson import read_json as rjv
 from flask import Flask, render_template, jsonify, request
 
-
 mouse_controller = mouse.Controller()
 is_pressed = False
 is_left_pressed = False
@@ -17,6 +16,10 @@ y_val = 0
 speed = 0
 toggle_key = "p"
 reset_button = "h"
+hipfire_mode = False
+hipfire_x = 0
+hipfire_y = 0
+hipfire_speed = 0
 
 toggled = False
 running = True
@@ -24,16 +27,20 @@ running = True
 def move_mouse(dx, dy):
     ctypes.windll.user32.mouse_event(0x0001, int(dx), int(dy), 0, 0)
 
-
 def recoil_code():
-    global is_pressed, toggled, running
+    global is_pressed, toggled, running, hipfire_mode, is_left_pressed, hipfire_x, hipfire_y, hipfire_speed
     while running:
-        if is_pressed and toggled:
-            move_mouse(x_val, y_val)
-            time.sleep(speed)
-        else:
-            time.sleep(0.01)
-
+        if toggled:
+            if hipfire_mode:
+                if is_left_pressed:
+                    move_mouse(hipfire_x, hipfire_y)
+                    time.sleep(hipfire_speed)
+                    continue
+            if is_pressed:
+                move_mouse(x_val, y_val)
+                time.sleep(speed)
+                continue
+        time.sleep(0.01)
 
 def on_click(x, y, button, pressed):
     global is_left_pressed, is_right_pressed, is_pressed
@@ -42,7 +49,6 @@ def on_click(x, y, button, pressed):
     elif button == Button.right:
         is_right_pressed = pressed
     is_pressed = is_left_pressed and is_right_pressed
-
 
 def on_press(key):
     global toggled
@@ -55,22 +61,20 @@ def on_press(key):
     except AttributeError:
         pass
 
-
 def run_all(pre):
-    global x_val, y_val, speed, toggled
-    toggled = False
+    global x_val, y_val, speed, toggled, hipfire_x, hipfire_y, hipfire_mode, hipfire_speed
     if pre.lower() == "g36c":
-        x_val = 0.999; y_val = 6.9; speed = 0.025
+        x_val = 0.999; y_val = 6.9; speed = 0.025; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "mp7":
-        x_val = 0.05; y_val = 7.4; speed = 0.02
+        x_val = 0.05; y_val = 7.4; speed = 0.02; hipfire_x = 0.05; hipfire_y = 8; hipfire_mode=True;hipfire_speed=0.045
     elif pre.lower() == "smg12":
-        x_val = -1.18; y_val = 23; speed = 0.047
+        x_val = 3.5; y_val = 23; speed = 0.047; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "mp5":
-        x_val = 0.05; y_val = 11; speed = 0.05
+        x_val = 0.05; y_val = 11; speed = 0.05; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "ak12":
-        x_val = 0.0001; y_val = 5; speed = 0.02
+        x_val = 0.0001; y_val = 5; speed = 0.02; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "f2":
-        x_val = -1.75; y_val = 21.3; speed = 0.048
+        x_val = -1.75; y_val = 21.3; speed = 0.048; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "custom":
         x_val = rjv("configuration/config.json", "x_val")
         y_val = rjv("configuration/config.json", "y_val")
@@ -89,20 +93,16 @@ def init():
 
 threading.Thread(target=recoil_code, daemon=True).start()
 
-
 mouse_listener = mouse.Listener(on_click=on_click)
 keyboard_listener = keyboard.Listener(on_press=on_press)
 mouse_listener.start()
 keyboard_listener.start()
 
-
 app = Flask(__name__)
-
 
 @app.route('/')
 def index():
     return open("index.html").read()
-
 
 @app.route('/toggle')
 def toggle():
@@ -110,31 +110,39 @@ def toggle():
     toggled = not toggled
     return jsonify(state=toggled)
 
-
 @app.route('/status')
 def status():
-    return jsonify(state=toggled)
+    return jsonify(state=toggled, hipfire=hipfire_mode)
 
 @app.route("/preset/<name>")
 def load_preset(name):
-    run_all(name)  
+    run_all(name)
     return jsonify({
         "preset": name,
         "x": x_val,
         "y": y_val,
-        "speed": speed
+        "speed": speed,
+        "hipfire": hipfire_mode,
+        "hipfire_x": hipfire_x,
+        "hipfire_y": hipfire_y,
+        "hipfire_speed": hipfire_speed
     })
 
-
-
-@app.route('/set')
+@app.route('/set', methods=['POST'])
 def set_values():
     global x_val, y_val, speed
-    x_val = float(request.args.get("x"))
-    y_val = float(request.args.get("y"))
-    speed = float(request.args.get("s"))
-    return jsonify(status=f"Values updated: x={x_val}, y={y_val}, s={speed}")
+    data = request.get_json(force=True)
+    if "xval" in data: x_val = float(data["xval"])
+    if "yval" in data: y_val = float(data["yval"])
+    if "speed" in data: speed = float(data["speed"])
+    return jsonify(status="updated", x=x_val, y=y_val, speed=speed)
 
+@app.route("/hipfire", methods=["POST"])
+def set_hipfire():
+    global hipfire_mode
+    data = request.get_json(force=True)
+    hipfire_mode = bool(data.get("hipfire", False))
+    return jsonify(hipfire=hipfire_mode)
 
 def start_web():
     app.run(host="0.0.0.0", port=5000)
