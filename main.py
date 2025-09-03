@@ -75,6 +75,8 @@ def run_all(pre):
         x_val = 0.0001; y_val = 5; speed = 0.02; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "f2":
         x_val = -1.75; y_val = 21.3; speed = 0.048; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
+    elif pre.lower() == "9x919vsn":
+        x_val = -1.0612; y_val = 12.551; speed = 0.048; hipfire_x = 0.05; hipfire_y = 8; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "custom":
         x_val = rjv("configuration/config.json", "x_val")
         y_val = rjv("configuration/config.json", "y_val")
