@@ -5,6 +5,48 @@ import threading
 import ctypes, os
 from modules.readjson import read_json as rjv
 from flask import Flask, render_template, jsonify, request
+import  requests, zipfile
+
+
+CURRENT_VERSION = "1.0.1"
+
+
+VERSION_URL = "https://vacgtm.github.io/releases/version.json"
+
+def check_for_update():
+    r = requests.get(VERSION_URL)
+    data = r.json()
+
+    latest_version = data["version"]
+    download_url = data["download_url"]
+
+    if latest_version != CURRENT_VERSION:
+        print(f"Update found: {latest_version} (current {CURRENT_VERSION})")
+        download_update(download_url)
+    else:
+        print("No update available.")
+
+def download_update(url):
+    print("Downloading update...")
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+
+    with open("update.zip", "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    print("Extracting update...")
+    with zipfile.ZipFile("update.zip", "r") as zip_ref:
+        zip_ref.extractall(".")
+
+    print("Cleaning up...")
+    os.remove("update.zip")
+
+    print("✅ Update installed successfully. Exiting to apply changes...")
+    time.sleep(3)
+    os._exit(0)
+
+check_for_update()
 
 mouse_controller = mouse.Controller()
 is_pressed = False
@@ -32,7 +74,7 @@ def recoil_code():
     while running:
         if toggled:
             if hipfire_mode:
-                if is_left_pressed:
+                if is_left_pressed and not is_right_pressed:
                     move_mouse(hipfire_x, hipfire_y)
                     time.sleep(hipfire_speed)
                     continue
@@ -72,7 +114,7 @@ def run_all(pre):
     elif pre.lower() == "mp5":
         x_val = 0.05; y_val = 11; speed = 0.05; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "ak12":
-        x_val = 0.0001; y_val = 5; speed = 0.02; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
+        x_val = 0.0001; y_val = 7.1; speed = 0.02; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "f2":
         x_val = -1.75; y_val = 21.3; speed = 0.048; hipfire_x = 0.05; hipfire_y = 5.4; hipfire_mode=False;hipfire_speed=0.045
     elif pre.lower() == "9x919vsn":
